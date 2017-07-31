@@ -1,0 +1,15 @@
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.pyc
+RTNet/**/*
+MotifCountingTemplates/**/*
+DATA_motif_finding_template_list/**/*
+CompositeNet/**/*
+BiNet/**/*
+# Dependency directories
