@@ -967,10 +967,3 @@ class RTNet(object):
 			outFileN.write("RT genes:\n")
 			for i_ind, i in enumerate(each[3]):
 				outFileN.write(i+","+str(each[4][i_ind]) + '\n')
-
-if __name__ == '__main__':
-	argv = sys.argv[1:]
-	x = RTNet()
-	# z = x.FindEnrichedMotifs(argv[0], float(argv[1]))
-	# z = x.CreateCompositeNetForVis(argv[0], float(argv[1]))
-	z = x.CreateBinet(argv[0], float(argv[1]))

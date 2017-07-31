@@ -10,7 +10,7 @@ source = 'APOB'
 # it will return None, but creates csv file for the input for the Cytoscape.
 # uncomment to run this version
 '''
-# net.CreateDirectedRTNetFromOneSource(which_layer=which_layer, etolOpt=etolOpt, source=source)
+net.CreateDirectedRTNetFromOneSource(which_layer=which_layer, etolOpt=etolOpt, source=source)
 
 '''
 # Construction of Directed RT network from all possible source nodes
@@ -25,4 +25,4 @@ source = 'APOB'
 # it will return None, but creates csv file for the input for the Cytoscape.
 # uncomment to run this version
 '''
-net.CreateDirectedRTNetFromOneSourceRecur(which_layer=which_layer, etolOpt=etolOpt, source=source)
+# net.CreateDirectedRTNetFromOneSourceRecur(which_layer=which_layer, etolOpt=etolOpt, source=source)

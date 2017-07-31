@@ -1,0 +1,4 @@
+numpy==1.11.0
+networkx==1.11
+python-louvain==0.8
+pydot==1.2.3
