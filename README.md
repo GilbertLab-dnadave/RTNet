@@ -6,6 +6,9 @@ Python 2.7
 	> pip install -r requirements.txt
 ```
 
+# Specify parameters
+Before running below do_something.py, please edit parameters in each file.
+
 ##### Create community RT network For RT Networks visualization. It will return None, but creates txt file for the input for the SAFE algorithm.
 ```
 	> python do_create_community_rtnet_forVis.py
@@ -35,3 +38,6 @@ Python 2.7
 ```
 	> python do_create_binet.py
 ```
+
+# Output Location
+Please check RTNet directory.
