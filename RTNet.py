@@ -204,7 +204,8 @@ class RTNet(object):
 				os.makedirs(outdir)
 			fout = open(outdir + '/{}_{}_rawRTNet.csv'.format(which_layer, corr_thresh), 'w')
 			fout.write("GENE1,GENE2,CORR,DISTANT,DISTANCE\n")
-
+		return self.HelperCreateRTNet(net_dic=net_dic, corr_thresh=corr_thresh, fout=fout, bool_out_txt=bool_out_txt)
+	def HelperCreateRTNet(self, net_dic, corr_thresh, fout=None, bool_out_txt=False):
 		GENE_NAMES = net_dic['GENE_NAMES']
 		LOC = net_dic['LOC']
 		DATA = net_dic['DATA']
@@ -239,6 +240,7 @@ class RTNet(object):
 							out_str = "{},{},{},{},{}\n".format(GENE_NAMES[ind_i], GENE_NAMES[ind_j], here_corr, distant, distance)
 							fout.write(out_str)
 		return G
+
 	# Create community RT network For RT Networks visualization
 	# it will return None, but creates txt file for the input for the SAFE algorithm.
 	def CreateCommunityRTNetForVis(self, which_layer, corr_thresh, degree_filter_thresh):
@@ -845,46 +847,13 @@ class RTNet(object):
 	# gene expression network with all 3 fold difference genes and RT network with all switching genes
 	# it will return None, but creates csv file for the input for the Cytoscape.
 	def CreateBinet(self, which_layer, corr_thresh):
-		nFoldDiff = 3
-		pre_dic1 = self.GetWhichLayerData(which_layer, 'EXP')
-		EXP_GENE_NAMES = pre_dic1['GENE_NAMES']
-		EXP_LOC = pre_dic1['LOC']
-		EXP_DATA = pre_dic1['DATA']
-
-		# at least 3-fold difference
-		include_exp_ind = []
-		for each_exp_ind, each_exp_data in enumerate(EXP_DATA):
-			if max(each_exp_data) / min(each_exp_data) > nFoldDiff:
-				include_exp_ind.append(each_exp_ind)
-		EXP_GENE_NAMES = list(itemgetter(*include_exp_ind)(EXP_GENE_NAMES))
-		EXP_LOC = list(itemgetter(*include_exp_ind)(EXP_LOC))
-		EXP_DATA = list(itemgetter(*include_exp_ind)(EXP_DATA))
-		#####
-
-		pre_dic2 = self.GetWhichLayerSwitchingData(which_layer)
-		RT_GENE_NAMES = pre_dic2['GENE_NAMES']
-		# append '-rt' at the end of the name
-		RT_GENE_NAMES = [i+'-rt' for i in RT_GENE_NAMES]
-		RT_LOC = pre_dic2['LOC']
-		RT_DATA = pre_dic2['DATA']
-
-		# # only ltoe constraint in RT
-		# ltoe_ind = []
-		# for each_rt_ind, each_rt in enumerate(RT_DATA):
-		# 	first_encountered = None
-		# 	for each in each_rt:
-		# 		if first_encountered is None and each<=-0.3:
-		# 			first_encountered = 'L'
-		# 			break
-		# 		elif first_encountered is None and each>=0.3:
-		# 			first_encountered = 'E'
-		# 			break
-		# 	if first_encountered == 'L':
-		# 		ltoe_ind.append(each_rt_ind)
-		# RT_GENE_NAMES = list(itemgetter(*ltoe_ind)(RT_GENE_NAMES))
-		# RT_LOC = list(itemgetter(*ltoe_ind)(RT_LOC))
-		# RT_DATA = list(itemgetter(*ltoe_ind)(RT_DATA))
-		# #####
+		pre_dic = self.HelperCreateBinet(which_layer, corr_thresh)
+		EXP_GENE_NAMES = pre_dic['EXP_GENE_NAMES']
+		EXP_LOC = pre_dic['EXP_LOC']
+		EXP_DATA = pre_dic['EXP_DATA']
+		RT_GENE_NAMES = pre_dic['RT_GENE_NAMES']
+		RT_LOC = pre_dic['RT_LOC']
+		RT_DATA = pre_dic['RT_DATA']
 		G = nx.Graph()
 		for exp_ind, each_exp in enumerate(EXP_DATA):
 			for rt_ind, each_rt in enumerate(RT_DATA):
@@ -967,3 +936,116 @@ class RTNet(object):
 			outFileN.write("RT genes:\n")
 			for i_ind, i in enumerate(each[3]):
 				outFileN.write(i+","+str(each[4][i_ind]) + '\n')
+	# Construction of Bipartite Network (with specific exp gene) between
+	# gene expression network with all 3 fold difference genes and RT network with all switching genes
+	# it will return None, but creates csv file for the input for the Cytoscape.
+	def CreateBinetWithSpecificEXPGene(self, which_layer, corr_thresh, specific_gene, ratio):
+		pre_dic = self.HelperCreateBinet(which_layer, corr_thresh)
+		EXP_GENE_NAMES = pre_dic['EXP_GENE_NAMES']
+		EXP_LOC = pre_dic['EXP_LOC']
+		EXP_DATA = pre_dic['EXP_DATA']
+		RT_GENE_NAMES = pre_dic['RT_GENE_NAMES']
+		RT_LOC = pre_dic['RT_LOC']
+		RT_DATA = pre_dic['RT_DATA']
+		if specific_gene not in EXP_GENE_NAMES:
+			print("{} not in EXP_GENE_NAMES!".format(specific_gene))
+			return
+		# find exp genes that are correlated with this specific gene.
+		EXP_G = nx.Graph()
+		for exp_ind_i in xrange(len(EXP_DATA)):
+			specific_gene_ind = EXP_GENE_NAMES.index(specific_gene)
+			here_corr = np.corrcoef(EXP_DATA[specific_gene_ind], EXP_DATA[exp_ind_i])[0, 1]
+			if here_corr >= corr_thresh:
+				distance = -1
+				if EXP_LOC[specific_gene_ind][0] == EXP_LOC[exp_ind_i][0]:
+					distance = abs(EXP_LOC[specific_gene_ind][1] - EXP_LOC[exp_ind_i][1])
+				distant = 1
+				if EXP_LOC[specific_gene_ind][0] == EXP_LOC[exp_ind_i][0] and distance < 500000:
+					distant = 0
+				if distant==1:
+					EXP_G.add_edge(EXP_GENE_NAMES[specific_gene_ind], EXP_GENE_NAMES[exp_ind_i], corr = here_corr)
+		# find rt genes that are correlated with all found exp genes.
+		RT_NODES_SET = set()
+		RT_NODES_INDS = list()
+		for rt_ind_i in xrange(len(RT_DATA)):
+			hcount = 0
+			for exp_gene in EXP_G.nodes():
+				exp_ind_j = EXP_GENE_NAMES.index(exp_gene)
+				here_corr = np.corrcoef(RT_DATA[rt_ind_i], EXP_DATA[exp_ind_j])[0, 1]
+				if here_corr >= corr_thresh:
+					distance = -1
+					if RT_LOC[rt_ind_i][0] == EXP_LOC[exp_ind_j][0]:
+						distance = abs(RT_LOC[rt_ind_i][1] - EXP_LOC[exp_ind_j][1])
+					distant = 1
+					if RT_LOC[rt_ind_i][0] == EXP_LOC[exp_ind_j][0] and distance < 500000:
+						distant = 0
+					if distant==1:
+						hcount+=1
+			if hcount>=len(EXP_G.nodes()) * ratio:
+				RT_NODES_SET.add(RT_GENE_NAMES[rt_ind_i])
+				RT_NODES_INDS.append(rt_ind_i)
+				# print RT_GENE_NAMES[rt_ind_i], hcount, len(EXP_G.nodes())
+		RT_NODES_INDS.sort()
+		outdir = "BiNetWithSpecificEXPGene".format(which_layer, corr_thresh, ratio)
+		if not os.path.exists(outdir):
+			os.makedirs(outdir)
+		outFileN = open(outdir + '/{}_{}_{}_ratio{}.csv'.format(which_layer, corr_thresh, specific_gene, ratio), 'w')
+		outFileN.write("EXP genes:\n")
+		for i_ind, i in enumerate(EXP_G.nodes()):
+			outFileN.write(i + '\n')
+		outFileN.write("RT genes:\n")
+		for i_ind, i in enumerate(RT_NODES_SET):
+			outFileN.write(i + '\n')
+		
+	def HelperCreateBinet(self, which_layer, corr_thresh):
+		nFoldDiff = 3
+		pre_dic1 = self.GetWhichLayerData(which_layer, 'EXP')
+		EXP_GENE_NAMES = pre_dic1['GENE_NAMES']
+		EXP_LOC = pre_dic1['LOC']
+		EXP_DATA = pre_dic1['DATA']
+
+		# at least 3-fold difference
+		include_exp_ind = []
+		for each_exp_ind, each_exp_data in enumerate(EXP_DATA):
+			if max(each_exp_data) / min(each_exp_data) > nFoldDiff:
+				include_exp_ind.append(each_exp_ind)
+		EXP_GENE_NAMES = list(itemgetter(*include_exp_ind)(EXP_GENE_NAMES))
+		EXP_LOC = list(itemgetter(*include_exp_ind)(EXP_LOC))
+		EXP_DATA = list(itemgetter(*include_exp_ind)(EXP_DATA))
+		#####
+
+		pre_dic2 = self.GetWhichLayerSwitchingData(which_layer)
+		RT_GENE_NAMES = pre_dic2['GENE_NAMES']
+		# append '-rt' at the end of the name
+		RT_GENE_NAMES = [i+'-rt' for i in RT_GENE_NAMES]
+		RT_LOC = pre_dic2['LOC']
+		RT_DATA = pre_dic2['DATA']
+
+		# # only ltoe constraint in RT
+		# ltoe_ind = []
+		# for each_rt_ind, each_rt in enumerate(RT_DATA):
+		# 	first_encountered = None
+		# 	for each in each_rt:
+		# 		if first_encountered is None and each<=-0.3:
+		# 			first_encountered = 'L'
+		# 			break
+		# 		elif first_encountered is None and each>=0.3:
+		# 			first_encountered = 'E'
+		# 			break
+		# 	if first_encountered == 'L':
+		# 		ltoe_ind.append(each_rt_ind)
+		# RT_GENE_NAMES = list(itemgetter(*ltoe_ind)(RT_GENE_NAMES))
+		# RT_LOC = list(itemgetter(*ltoe_ind)(RT_LOC))
+		# RT_DATA = list(itemgetter(*ltoe_ind)(RT_DATA))
+		# #####
+
+		ret_dic = {}
+		ret_dic['EXP_GENE_NAMES'] = EXP_GENE_NAMES
+		ret_dic['EXP_LOC'] = EXP_LOC
+		ret_dic['EXP_DATA'] = EXP_DATA
+		ret_dic['RT_GENE_NAMES'] = RT_GENE_NAMES
+		ret_dic['RT_LOC'] = RT_LOC
+		ret_dic['RT_DATA'] = RT_DATA
+		return ret_dic
+
+		
