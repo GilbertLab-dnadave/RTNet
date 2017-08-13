@@ -38,6 +38,3 @@ Before running below do_something.py, please edit parameters in each file.
 ```
 	> python do_create_binet.py
 ```
-
-# Output Location
-Please check RTNet directory.
