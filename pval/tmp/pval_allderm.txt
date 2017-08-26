@@ -1,18 +1,18 @@
 Number of nodes and edges of the Neph graph
-77
-412
+537
+32926
 
 Number of nodes and edges of the RTG graph
-77
-373
+171
+90
 
 Number of common edges between Neph and RT when direction is not significant
-50
+14
 
 Only Neph Edges and Only RT Edges
-362
-323
+32912
+76
 
 When direction is not significant, hypergeometric p-value is
-2.09371322205e-06
+0.0866261080699
 

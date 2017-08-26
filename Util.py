@@ -14,3 +14,11 @@ class Util(object):
 	@staticmethod
 	def GetP(K, i, M, m):
 		return Util.ncr(K, i) * Util.ncr(M-K, m-i)
+	@staticmethod
+	def GetColumn(wb, sheet_name, whichCol, num_max_row):
+		ret_list = []
+		sheet = wb[sheet_name]
+		for row in xrange(2, num_max_row+1):
+			val = sheet[whichCol+str(row)]
+			ret_list.append(val.value.replace(u'\u2212', u'-'))
+		return ret_list

@@ -4,6 +4,7 @@ Dependency:
 	networkx : pip install networkx
 	python-louvain (community) : pip install python-louvain
 	pydot : pip install pydot
+	openpyxl: pip install openpyxl
 '''
 
 import itertools
@@ -24,6 +25,9 @@ import scipy.stats as st
 from shutil import copyfile
 from heapq import heappush
 from heapq import heappop
+from openpyxl import load_workbook
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 class RTNet(object):
 	def __init__(self, source="./uniq_rt_exp.csv", neph_source="./DATA_NephNet/allderm_network.txt"):
@@ -199,6 +203,7 @@ class RTNet(object):
 			outdir = 'RTNet/rawRTNet_onlyNeph'
 			net_dic = self.GetWhichLayerNephSwitchingData(which_layer)
 
+		fout=None
 		if bool_out_txt:
 			if not os.path.exists(outdir):
 				os.makedirs(outdir)
@@ -543,33 +548,40 @@ class RTNet(object):
 			NephG.add_edge(each_edge[0], each_edge[1])
 		return NephG
 	# Print Hypergeometric P-value of overlap between Neph Switching RT and Neph Switching TRN
-	def PrintHyperPVal(self, which_layer, corr_thresh):
+	def PrintHyperPVal(self, which_layer, corr_thresh, fout=sys.stdout):
 		NephG = self.ReadNephTRNNet(which_layer)
 
-		rt_dic = self.GetWhichLayerNephSwitchingData(which_layer)
-		RT_NAMES = rt_dic["GENE_NAMES"]
+		# only neph RT
+		RTG = self.CreateRTNet(which_layer, corr_thresh, True)
+		# reduce Neph G
+		willBeRemoved=[]
+		rt_node_set = set(RTG.nodes())
+		for n in NephG.nodes():
+			if n not in rt_node_set:
+				willBeRemoved.append(n)
+		for w in willBeRemoved:
+			NephG.remove_node(w)
+		#####
 
-		print "Number of nodes and edges of the Neph graph"
-		print len(NephG.nodes())
-		print len(NephG.edges())
-		print
+		fout.write( "Number of nodes and edges of the Neph graph\n")
+		fout.write( str(len(NephG.nodes())) + '\n' )
+		fout.write( str(len(NephG.edges())) + '\n' )
+		fout.write('\n')
 
 		n = len(NephG.nodes())
 		m = len(NephG.edges())
 		M = 2 * Util.ncr(n, 2)
 
-		# only neph RT
-		RTG = self.CreateRTNet(which_layer, corr_thresh, True)
 		# try composing RT network (RT network is undirected.)
 
 		NephG_edgeDict={key: 0 for key,value in zip(NephG.edges(), xrange(len(NephG.edges())))}
 		NephG_edgeSet = set(NephG_edgeDict.keys())
 		RTG_edgeSet = set([(a, b) for a, b in RTG.edges()])
 
-		print "Number of nodes and edges of the RTG graph"
-		print len(RTG.nodes())
-		print len(RTG.edges())
-		print
+		fout.write( "Number of nodes and edges of the RTG graph\n")
+		fout.write( str(len(RTG.nodes())) + '\n')
+		fout.write( str(len(RTG.edges())) + '\n')
+		fout.write('\n')
 
 		K = len(RTG.edges())
 
@@ -581,23 +593,23 @@ class RTNet(object):
 		neph_edges = 0
 		neph_edges = len(NephG_edgeSet) - common_edges
 		rt_edges = len(RTG_edgeSet) - common_edges
-		print "Number of common edges between Neph and RT when direction is not significant"
-		print common_edges
-		print
+		fout.write( "Number of common edges between Neph and RT when direction is not significant\n")
+		fout.write( str(common_edges) + '\n')
+		fout.write('\n')
 		k2 = common_edges
-		print "Only Neph Edges and Only RT Edges"
-		print neph_edges
-		print rt_edges
-		print
+		fout.write( "Only Neph Edges and Only RT Edges\n")
+		fout.write( str(neph_edges) + '\n')
+		fout.write( str(rt_edges) + '\n')
+		fout.write('\n')
 		# Get PVal of hypergeo (direction is not significant).
 		res = 0
 		for i in xrange(k2+1, K+1):
 			res += Util.GetP(K, i, M, m)
 		res = log(res) - log(Util.ncr(M, m))
 		res = exp(res)
-		print "When direction is not significant, hypergeometric p-value is"
-		print res
-		print
+		fout.write( "When direction is not significant, hypergeometric p-value is\n")
+		fout.write( str(res) + '\n')
+		fout.write('\n')
 	# Get Neph TRN (non-RT nodes are removed) and Neph RT Graph
 	def Get_RTNodesNephG_RTG(self, which_layer, corr_thresh):
 		NephG = self.ReadNephTRNNet(which_layer)
@@ -952,6 +964,8 @@ class RTNet(object):
 			return
 		# find exp genes that are correlated with this specific gene.
 		EXP_G = nx.Graph()
+		exp_corr_dic = {}
+		exp_corr_dic[specific_gene] = 1.0
 		for exp_ind_i in xrange(len(EXP_DATA)):
 			specific_gene_ind = EXP_GENE_NAMES.index(specific_gene)
 			here_corr = np.corrcoef(EXP_DATA[specific_gene_ind], EXP_DATA[exp_ind_i])[0, 1]
@@ -964,9 +978,9 @@ class RTNet(object):
 					distant = 0
 				if distant==1:
 					EXP_G.add_edge(EXP_GENE_NAMES[specific_gene_ind], EXP_GENE_NAMES[exp_ind_i], corr = here_corr)
+					exp_corr_dic[EXP_GENE_NAMES[exp_ind_i]] = here_corr
 		# find rt genes that are correlated with all found exp genes.
 		RT_NODES_SET = set()
-		RT_NODES_INDS = list()
 		for rt_ind_i in xrange(len(RT_DATA)):
 			hcount = 0
 			for exp_gene in EXP_G.nodes():
@@ -983,19 +997,24 @@ class RTNet(object):
 						hcount+=1
 			if hcount>=len(EXP_G.nodes()) * ratio:
 				RT_NODES_SET.add(RT_GENE_NAMES[rt_ind_i])
-				RT_NODES_INDS.append(rt_ind_i)
 				# print RT_GENE_NAMES[rt_ind_i], hcount, len(EXP_G.nodes())
-		RT_NODES_INDS.sort()
-		outdir = "BiNetWithSpecificEXPGene".format(which_layer, corr_thresh, ratio)
+		outdir = "BiNetWithSpecificEXPGene"
 		if not os.path.exists(outdir):
 			os.makedirs(outdir)
 		outFileN = open(outdir + '/{}_{}_{}_ratio{}.csv'.format(which_layer, corr_thresh, specific_gene, ratio), 'w')
 		outFileN.write("EXP genes:\n")
-		for i_ind, i in enumerate(EXP_G.nodes()):
-			outFileN.write(i + '\n')
+		sorted_exp_nodes = []
+		for each_node in EXP_G.nodes():
+			h_tup = (exp_corr_dic[each_node], each_node)
+			sorted_exp_nodes.append(h_tup)
+		sorted_exp_nodes.sort(reverse=True)
+		for each_node in sorted_exp_nodes:
+			outFileN.write(str(each_node[1]) + ',' + str(each_node[0]) + '\n')
 		outFileN.write("RT genes:\n")
 		for i_ind, i in enumerate(RT_NODES_SET):
 			outFileN.write(i + '\n')
+		print "len(EXP_G) = {}".format(len(EXP_G.nodes()))
+		print "len(RT_G) = {}".format(len(RT_NODES_SET))
 		
 	def HelperCreateBinet(self, which_layer, corr_thresh):
 		nFoldDiff = 3
@@ -1047,5 +1066,114 @@ class RTNet(object):
 		ret_dic['RT_LOC'] = RT_LOC
 		ret_dic['RT_DATA'] = RT_DATA
 		return ret_dic
+	# Construction of Bipartite Network (with specific selected EXP genes) between
+	# gene expression network that consists of selected EXP genes and RT network with all switching genes
+	# it will return None, but creates csv file for the input for the Cytoscape.
+	def CreateBinetWithSpecificSelectedEXPGenes(self, which_layer, corr_thresh, sheet_name, col_name, max_row, ratio):
+		col_name_match = {
+			'A': 'hESC',
+			'B': 'DE',
+			'C': 'Liver_D5',
+			'D': 'Liver_D8',
+			'E': 'Liver_D16',
+			'F': 'Panc_D5',
+			'G': 'Panc_D8',
+			'H': 'Panc_D12',
+			'I': 'LPM',
+			'J': 'Splanch',
+			'K': 'Mesothel',
+			'L': 'SM',
+			'M': 'NPC',
+			'N': 'NC',
+			'O': 'MSC',
+		}
+		pre_dic1 = self.GetWhichLayerData(which_layer, 'EXP')
+		EXP_GENE_NAMES = pre_dic1['GENE_NAMES']
+		EXP_LOC = pre_dic1['LOC']
+		EXP_DATA = pre_dic1['DATA']
 
+		# nFoldDiff=3
+		# # at least 3-fold difference
+		# include_exp_ind = []
+		# for each_exp_ind, each_exp_data in enumerate(EXP_DATA):
+		# 	if max(each_exp_data) / min(each_exp_data) > nFoldDiff:
+		# 		include_exp_ind.append(each_exp_ind)
+		# EXP_GENE_NAMES = list(itemgetter(*include_exp_ind)(EXP_GENE_NAMES))
+		# EXP_LOC = list(itemgetter(*include_exp_ind)(EXP_LOC))
+		# EXP_DATA = list(itemgetter(*include_exp_ind)(EXP_DATA))
+		# #####
+
+		pre_dic2 = self.GetWhichLayerSwitchingData(which_layer)
+		RT_GENE_NAMES = pre_dic2['GENE_NAMES']
+		# append '-rt' at the end of the name
+		RT_GENE_NAMES = [i+'-rt' for i in RT_GENE_NAMES]
+		RT_LOC = pre_dic2['LOC']
+		RT_DATA = pre_dic2['DATA']
+
+		# load excel file and only considers EXP genes in the excel file.
+		wb = load_workbook('./Top genes per differentiation pathway.xlsx')
+		sel_genes = set(Util.GetColumn(wb, 'TopGenes', col_name, max_row))
+		include_exp_ind = []
+		for each_exp_ind, each_exp_gene in enumerate(EXP_GENE_NAMES):
+			if each_exp_gene in sel_genes:
+				include_exp_ind.append(each_exp_ind)
+		EXP_GENE_NAMES = list(itemgetter(*include_exp_ind)(EXP_GENE_NAMES))
+		EXP_LOC = list(itemgetter(*include_exp_ind)(EXP_LOC))
+		EXP_DATA = list(itemgetter(*include_exp_ind)(EXP_DATA))
 		
+		# find rt genes that are correlated with all found exp genes.
+		RT_NODES_SET = set()
+		RT_MAX_CORR = dict()
+		for rt_ind_i in xrange(len(RT_DATA)):
+			hcount = 0
+			max_here_corr = -1.0
+			for exp_gene in EXP_GENE_NAMES:
+				exp_ind_j = EXP_GENE_NAMES.index(exp_gene)
+				here_corr = np.corrcoef(RT_DATA[rt_ind_i], EXP_DATA[exp_ind_j])[0, 1]
+				if here_corr >= corr_thresh:
+					distance = -1
+					if RT_LOC[rt_ind_i][0] == EXP_LOC[exp_ind_j][0]:
+						distance = abs(RT_LOC[rt_ind_i][1] - EXP_LOC[exp_ind_j][1])
+					distant = 1
+					if RT_LOC[rt_ind_i][0] == EXP_LOC[exp_ind_j][0] and distance < 500000:
+						distant = 0
+					if distant==1:
+						hcount+=1
+						max_here_corr = max(max_here_corr, here_corr)
+			if hcount>=len(EXP_GENE_NAMES) * ratio:
+				RT_NODES_SET.add(RT_GENE_NAMES[rt_ind_i])
+				RT_MAX_CORR[RT_GENE_NAMES[rt_ind_i]] = max_here_corr
+		outdir = "BiNetWithSpecificSelectedEXPGenes"
+		if not os.path.exists(outdir):
+			os.makedirs(outdir)
+		outFileN = open(outdir + '/{}_{}_({})_({})_ratio{}.csv'.format(which_layer, corr_thresh, sheet_name, col_name_match[col_name], ratio), 'w')
+
+		# outFileN.write("EXP genes:\n")
+		# for each_node in EXP_GENE_NAMES:
+		# 	outFileN.write(str(each_node) + '\n')
+		# outFileN.write("RT genes:\n")
+		# sorted_rt_nodes = []
+		# for i_ind, i in enumerate(RT_NODES_SET):
+		# 	onetup = (RT_MAX_CORR[i], str(i))
+		# 	sorted_rt_nodes.append(onetup)
+		# sorted_rt_nodes.sort(reverse=True)
+		# for i in sorted_rt_nodes:
+		# 	outFileN.write(str(i[1]) + ',' + "{:.6f}".format(i[0]) + '\n')
+
+		outFileN.write("GENE,TYPE,MAX_CORR\n")
+		for each_node in EXP_GENE_NAMES:
+			hstr = '{},EXP,0.0\n'.format(each_node)
+			outFileN.write(hstr)
+		sorted_rt_nodes = []
+		for i_ind, i in enumerate(RT_NODES_SET):
+			onetup = (RT_MAX_CORR[i], str(i))
+			sorted_rt_nodes.append(onetup)
+		sorted_rt_nodes.sort(reverse=True)
+		for i in sorted_rt_nodes:
+			hstr = '{},RT,{:.6f}\n'.format(i[1], i[0])
+			outFileN.write(hstr)
+
+		print "len(EXP_G) = {}".format(len(EXP_GENE_NAMES))
+		print "len(RT_G) = {}".format(len(RT_NODES_SET))
+
+	
