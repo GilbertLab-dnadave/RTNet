@@ -1146,7 +1146,7 @@ class RTNet(object):
 		outdir = "BiNetWithSpecificSelectedEXPGenes"
 		if not os.path.exists(outdir):
 			os.makedirs(outdir)
-		outFileN = open(outdir + '/{}_{}_({})_({})_ratio{}.csv'.format(which_layer, corr_thresh, sheet_name, col_name_match[col_name], ratio), 'w')
+		outFileN = open(outdir + '/{}_{}_({})_({})_ratio{}.csv'.format(which_layer, int(corr_thresh*100), sheet_name, col_name_match[col_name], int(ratio*100)), 'w')
 
 		# outFileN.write("EXP genes:\n")
 		# for each_node in EXP_GENE_NAMES:

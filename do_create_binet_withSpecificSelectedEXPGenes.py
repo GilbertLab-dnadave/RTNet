@@ -12,7 +12,7 @@ GERM_LAYERS = ['ESCs--liver', 'ESCs--panc']
 CORR_THRESH_LIST = [0.75, 0.9]
 SHEETS = ["TopGenes", "Only TFs"]
 COLS = ['E', 'H'] # Liver_D16, and Panc_D12
-MAX_ROW = {'TopGenes': [102, 101], 'Only TFs':[50, 51]}
+MAX_ROW = {'TopGenes': [100, 101], 'Only TFs':[50, 51]}
 RATIOS = [0.5, 0.75]
 for each_col_ind, (each_layer, each_col) in enumerate(zip(GERM_LAYERS, COLS)):
 	for each_corr in CORR_THRESH_LIST:
