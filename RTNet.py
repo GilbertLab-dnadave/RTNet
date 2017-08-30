@@ -1173,7 +1173,28 @@ class RTNet(object):
 			hstr = '{},RT,{:.6f}\n'.format(i[1], i[0])
 			outFileN.write(hstr)
 
+		outdir2 = "cytoscape"
+		if not os.path.exists(outdir + '/' + outdir2):
+			os.makedirs(outdir + '/' + outdir2)
+		outFileN2 = open(outdir + '/' + outdir2 + '/{}_{}_({})_({})_ratio{}_cyto.csv'.format(which_layer, int(corr_thresh*100), sheet_name, col_name_match[col_name], int(ratio*100)), 'w')
+		outFileN2.write("EXP_GENE,RT_GENE,CORR\n")
+		for rt in RT_NODES_SET:
+			for exp in EXP_GENE_NAMES:
+				rt_ind_i = RT_GENE_NAMES.index(rt)
+				exp_ind_j = EXP_GENE_NAMES.index(exp_gene)
+				here_corr = np.corrcoef(RT_DATA[rt_ind_i], EXP_DATA[exp_ind_j])[0, 1]
+				if here_corr >= corr_thresh:
+					distance = -1
+					if RT_LOC[rt_ind_i][0] == EXP_LOC[exp_ind_j][0]:
+						distance = abs(RT_LOC[rt_ind_i][1] - EXP_LOC[exp_ind_j][1])
+					distant = 1
+					if RT_LOC[rt_ind_i][0] == EXP_LOC[exp_ind_j][0] and distance < 500000:
+						distant = 0
+					if distant==1:
+						outFileN2.write("{},{},{}\n".format(exp,rt,here_corr))
+
 		print "len(EXP_G) = {}".format(len(EXP_GENE_NAMES))
 		print "len(RT_G) = {}".format(len(RT_NODES_SET))
 
-	
+# r = RTNet()
+# r.CreateBinetWithSpecificSelectedEXPGenes('ESCs--liver', 0.75, 'TopGenes', 'E', 100, 0.5)
